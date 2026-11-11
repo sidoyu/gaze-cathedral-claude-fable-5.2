@@ -1,0 +1,33 @@
+// Drives the real page (no #shot): veil → click → look around → blink, capturing compositor screenshots.
+import { chromium } from 'playwright-core';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const browser = await chromium.launch({ headless: true, args: ['--single-process', '--in-process-gpu', '--no-zygote', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader', '--autoplay-policy=no-user-gesture-required'] });
+const page = await browser.newPage({ viewport: { width: 800, height: 450 }, deviceScaleFactor: 1 });
+const logs = [];
+page.on('console', m => { const t = m.text(); if (!/GPU stall|Automatic fallback/.test(t)) logs.push(`[${m.type()}] ${t}`); });
+page.on('pageerror', e => logs.push('[pageerror] ' + (e.stack || e.message)));
+const t0 = Date.now();
+await page.goto('file://' + path.join(root, 'index.html'));
+await page.screenshot({ path: path.join(root, 'shots/live0-loading.png') });
+await page.waitForFunction(() => document.getElementById('veil').classList.contains('ready') || document.getElementById('fail').style.display === 'flex', null, { timeout: 300000 });
+console.log('ready after', ((Date.now() - t0) / 1000).toFixed(1), 's');
+await page.screenshot({ path: path.join(root, 'shots/live1-veil.png') });
+await page.mouse.click(400, 225);
+await page.waitForTimeout(2500);
+await page.screenshot({ path: path.join(root, 'shots/live2-opening.png') });
+await page.waitForTimeout(24000);
+console.log('stats', JSON.stringify(await page.evaluate(() => window.__gaze.stats())));
+await page.screenshot({ path: path.join(root, 'shots/live3-open.png') });
+for (let i = 0; i < 20; i++) { await page.mouse.move(400 + i * 12, 225 + i * 2); await page.waitForTimeout(60); }
+await page.waitForTimeout(1500);
+await page.screenshot({ path: path.join(root, 'shots/live4-turned.png') });
+await page.mouse.down(); await page.waitForTimeout(1500);
+console.log('stats', JSON.stringify(await page.evaluate(() => window.__gaze.stats())));
+await page.screenshot({ path: path.join(root, 'shots/live5-shut.png') });
+await page.mouse.up(); await page.waitForTimeout(3000);
+console.log('stats', JSON.stringify(await page.evaluate(() => window.__gaze.stats())));
+await page.screenshot({ path: path.join(root, 'shots/live6-after.png') });
+for (const l of logs.slice(0, 40)) console.log(l);
+await browser.close();
