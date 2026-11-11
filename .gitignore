@@ -1,0 +1,5 @@
+node_modules/
+.npm-cache/
+.pw-browsers/
+.claude/
+.DS_Store
